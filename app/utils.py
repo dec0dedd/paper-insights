@@ -1,5 +1,4 @@
 import requests
-
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
@@ -7,6 +6,7 @@ import numpy as np
 
 
 def fetch_geo_datasets(pmids, batch_size=200):
+    """Fetches GSE IDs via e-utils API"""
     all_datasets = []
     gse_to_pmid = {}
 
@@ -42,6 +42,8 @@ def fetch_geo_datasets(pmids, batch_size=200):
 
 
 def fetch_geo_metadata_batch(gse_ids, batch_size=200):
+    """Fetches GEO metadata via e-utils API"""
+
     metadata = {}
     for i in range(0, len(gse_ids), batch_size):
         batch = gse_ids[i:i+batch_size]
@@ -68,15 +70,21 @@ def fetch_geo_metadata_batch(gse_ids, batch_size=200):
     return metadata
 
 
+def merge_metadata(metadata):
+    """Function to merge dataset's metadata into one string"""
+    return " ".join([
+        metadata['title'], metadata['type'], metadata['summary'],
+        metadata['organism'], metadata['design']
+    ])
+
+
 def cluster_datasets(datasets):
-    texts = [" ".join([
-        d.get('title', ''), d.get('type', ''), d.get('summary', ''),
-        d.get('organism', ''), d.get('design', '')
-    ]) for d in datasets]
+    texts = [merge_metadata(metadata) for metadata in datasets]
 
     vectorizer = TfidfVectorizer(stop_words='english')
     X = vectorizer.fit_transform(texts)
 
+    # in case of only 1 vector  or all zero vectors return default data
     if X.shape[0] < 2 or np.all(X.toarray() == 0):
         return [{
             'x': 0.0,
@@ -87,16 +95,15 @@ def cluster_datasets(datasets):
             'title': d['title']
         } for d in datasets]
 
+    # perform PCA to visualize data in 2D
     try:
-        pca = PCA(n_components=3)
+        pca = PCA(n_components=2)
         reduced = pca.fit_transform(X.toarray())
     except Exception:
-        reduced = X.toarray()[:, :3]
+        reduced = X.toarray()[:, :2]
 
-    n_clusters = min(5, len(np.unique(reduced, axis=0)))
-    if n_clusters < 2:
-        n_clusters = 1
-
+    # choose a reasonable number of clusters
+    n_clusters = max(1, min(5, len(np.unique(reduced, axis=0))))
     kmeans = KMeans(n_clusters=n_clusters, n_init='auto')
     labels = kmeans.fit_predict(reduced)
 

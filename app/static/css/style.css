@@ -1,0 +1,20 @@
+body {
+    background: #f8f9fa;
+    min-height: 100vh;
+}
+
+.custom-header {
+    background: #ffffff;
+    padding: 2rem 0;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.custom-header h1 {
+    font-size: 2.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+#plot {
+    min-height: 500px;
+}

@@ -1,3 +1,5 @@
+from app import app
+
 import requests
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
@@ -5,7 +7,7 @@ from sklearn.decomposition import PCA
 import numpy as np
 
 
-def fetch_geo_datasets(pmids, batch_size=200):
+def fetch_geo_datasets(pmids, batch_size):
     """Fetches GSE IDs via e-utils API"""
     all_datasets = []
     gse_to_pmid = {}
@@ -13,10 +15,7 @@ def fetch_geo_datasets(pmids, batch_size=200):
     for i in range(0, len(pmids), batch_size):
         batch_pmids = pmids[i:i+batch_size]
         ids_str = ",".join(batch_pmids)
-        link_url = (
-            f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi"
-            f"?dbfrom=pubmed&db=gds&linkname=pubmed_gds&id={ids_str}&retmode=json"
-        )
+        link_url = app.config['PUBMED_GDS_API_URL'] + f"&id={ids_str}&retmode=json"
         res = requests.get(link_url)
         link_data = res.json()
 
@@ -41,17 +40,14 @@ def fetch_geo_datasets(pmids, batch_size=200):
     return all_datasets
 
 
-def fetch_geo_metadata_batch(gse_ids, batch_size=200):
+def fetch_geo_metadata_batch(gse_ids, batch_size):
     """Fetches GEO metadata via e-utils API"""
 
     metadata = {}
     for i in range(0, len(gse_ids), batch_size):
         batch = gse_ids[i:i+batch_size]
         ids_str = ",".join(batch)
-        url = (
-            f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
-            f"?db=gds&id={ids_str}&retmode=json"
-        )
+        url = app.config['PUBMED_METADATA_API_URL'] + f"&id={ids_str}&retmode=json"
         res = requests.get(url)
         result = res.json().get('result', {})
 
@@ -97,13 +93,16 @@ def cluster_datasets(datasets):
 
     # perform PCA to visualize data in 2D
     try:
-        pca = PCA(n_components=2)
+        pca = PCA(n_components=app.config['NUM_OF_PCA_COMPONENTS'])
         reduced = pca.fit_transform(X.toarray())
     except Exception:
-        reduced = X.toarray()[:, :2]
+        reduced = X.toarray()[:, :app.config['NUM_OF_PCA_COMPONENTS']]
 
-    # choose a reasonable number of clusters
-    n_clusters = max(1, min(5, len(np.unique(reduced, axis=0))))
+    n_clusters = max(
+        1,
+        min(app.config['MAX_NUM_OF_CLUSTERS'], len(np.unique(reduced, axis=0)))
+    )
+
     kmeans = KMeans(n_clusters=n_clusters, n_init='auto')
     labels = kmeans.fit_predict(reduced)
 

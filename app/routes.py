@@ -15,8 +15,7 @@ def index():
 @app.route('/upload', methods=['POST'])
 def upload():
     pmid_file = request.files['file']
-    print("Sent!")
     pmids = [line.strip() for line in pmid_file.read().decode('utf-8').splitlines() if line.strip()]
-    datasets = fetch_geo_datasets(pmids, 200)
+    datasets = fetch_geo_datasets(pmids, app.config['BATCH_SIZE'])
     clustered = cluster_datasets(datasets)
     return jsonify(clustered)
